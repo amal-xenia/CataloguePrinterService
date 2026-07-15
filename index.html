@@ -1,0 +1,1880 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Control Panel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <style>
+      :root {
+        --bg: #050505;
+        /* Pitch Black */
+        --surface: #0f0f11;
+        /* Dark Charcoal Gray */
+        --surface2: #18181b;
+        /* Neutral Zinc/Gray */
+        --border: rgba(255, 255, 255, 0.06);
+        --accent: #007aff;
+        /* macOS system blue */
+        --accent-green: #28c740;
+        /* macOS system green */
+        --accent-red: #ff5f56;
+        --accent-yellow: #ffbd2e;
+        --text: #e2e8f0;
+        --muted: #64748b;
+        --success: #10b981;
+        --warning: #f59e0b;
+      }
+
+      *,
+      *::before,
+      *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body,
+      html {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        /* Prevent default browser scrollbars */
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Inter", sans-serif;
+        font-size: 13px;
+        user-select: none;
+      }
+
+      /* Noise overlay */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.02'/%3E%3C/svg%3E");
+        pointer-events: none;
+        z-index: 1000;
+      }
+
+      /* ── macOS App Window Wrapper ── */
+      .app-window {
+        display: flex;
+        flex-direction: column;
+        width: 100vw;
+        height: 100vh;
+        background: var(--bg);
+        position: relative;
+      }
+
+      /* ── macOS Titlebar ── */
+      .app-titlebar {
+        height: 38px;
+        background: rgba(0, 0, 0, 0.25);
+        border-bottom: 1px solid var(--border);
+        display: grid;
+        grid-template-columns: 100px 1fr 150px;
+        align-items: center;
+        padding: 0 16px;
+        flex-shrink: 0;
+        z-index: 100;
+        -webkit-app-region: drag;
+        /* Allow window dragging */
+      }
+
+      .traffic-lights {
+        display: flex;
+        gap: 8px;
+        -webkit-app-region: no-drag;
+        /* Prevent drag, allow click */
+      }
+
+      .light {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: inline-block;
+        cursor: pointer;
+        /* Show pointer cursor on hover */
+        transition: opacity 0.15s;
+      }
+
+      .light:hover {
+        opacity: 0.8;
+      }
+
+      .light-close {
+        background: var(--accent-red);
+      }
+
+      .light-minimize {
+        background: var(--accent-yellow);
+      }
+
+      .light-maximize {
+        background: var(--accent-green);
+      }
+
+      .app-title {
+        text-align: center;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text);
+        opacity: 0.85;
+        letter-spacing: 0.02em;
+      }
+
+      .server-status {
+        justify-self: end;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--success);
+        background: rgba(16, 185, 129, 0.08);
+        padding: 4px 10px;
+        border-radius: 12px;
+        border: 1px solid rgba(16, 185, 129, 0.15);
+        -webkit-app-region: no-drag;
+        /* Prevent drag, allow click */
+      }
+
+      .status-dot {
+        width: 6px;
+        height: 6px;
+        background: var(--success);
+        border-radius: 50%;
+        box-shadow: 0 0 6px var(--success);
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          transform: scale(1);
+          opacity: 0.8;
+        }
+
+        50% {
+          transform: scale(1.2);
+          opacity: 1;
+        }
+      }
+
+      /* ── App Layout Body ── */
+      .app-body {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+      }
+
+      /* ── App Sidebar ── */
+      .app-sidebar {
+        width: 200px;
+        background: rgba(17, 24, 39, 0.45);
+        border-right: 1px solid var(--border);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        padding: 24px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        flex-shrink: 0;
+      }
+
+      .sidebar-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding-left: 6px;
+        margin-bottom: 12px;
+      }
+
+      .sidebar-logo {
+        width: 24px;
+        height: 24px;
+        background: linear-gradient(135deg, var(--accent), #8b5cf6);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 0.8rem;
+        box-shadow: 0 0 8px rgba(0, 122, 255, 0.3);
+      }
+
+      .sidebar-header h2 {
+        font-size: 0.9rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+
+      .nav-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        list-style: none;
+      }
+
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 12px;
+        border-radius: 8px;
+        color: var(--muted);
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .nav-item:hover {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .nav-item.active {
+        color: white;
+        background: var(--accent);
+        box-shadow: 0 4px 12px rgba(0, 122, 255, 0.35);
+      }
+
+      .nav-item i {
+        width: 16px;
+        font-size: 0.9rem;
+        text-align: center;
+      }
+
+      /* ── Main Content Area ── */
+      .app-content {
+        flex: 1;
+        background: var(--bg);
+        padding: 24px 28px;
+        overflow-y: auto;
+        position: relative;
+      }
+
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 3px;
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.2);
+      }
+
+      /* ── View Container Management ── */
+      .content-view {
+        display: none;
+        animation: fadeIn 0.25s ease-out;
+        height: 100%;
+      }
+
+      .content-view.active {
+        display: block;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(4px);
+        }
+
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      /* ── View Header ── */
+      .view-header {
+        margin-bottom: 20px;
+      }
+
+      .view-header h1 {
+        font-size: 1.4rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin-bottom: 4px;
+      }
+
+      .view-header p {
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
+      /* ── Grid Layouts ── */
+      .dashboard-grid {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 20px;
+        align-items: start;
+      }
+
+      @media (max-width: 900px) {
+        .dashboard-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* Cards */
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+      }
+
+      .card h3 {
+        font-size: 0.95rem;
+        font-weight: 700;
+        margin-bottom: 14px;
+        color: var(--text);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .card h3 i {
+        color: var(--accent);
+      }
+
+      /* Forms and Controls */
+      .form-group {
+        margin-bottom: 16px;
+      }
+
+      .form-group label {
+        display: block;
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: var(--muted);
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .select-wrapper {
+        display: flex;
+        gap: 8px;
+      }
+
+      select,
+      button,
+      input {
+        font-family: inherit;
+        outline: none;
+      }
+
+      select {
+        flex: 1;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 9px 12px;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      select:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2);
+      }
+
+      .btn-icon {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        color: var(--muted);
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .btn-icon:hover {
+        color: var(--text);
+        border-color: rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      /* Status bar */
+      .status-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        margin-top: -6px;
+        margin-bottom: 16px;
+        background: rgba(0, 0, 0, 0.1);
+      }
+
+      .status-bar .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--muted);
+      }
+
+      .status-bar.online {
+        color: var(--success);
+        background: rgba(16, 185, 129, 0.06);
+        border-color: rgba(16, 185, 129, 0.15);
+      }
+
+      .status-bar.online .dot {
+        background: var(--success);
+        box-shadow: 0 0 6px var(--success);
+      }
+
+      .status-bar.offline {
+        color: var(--warning);
+        background: rgba(245, 158, 11, 0.06);
+        border-color: rgba(245, 158, 11, 0.15);
+      }
+
+      .status-bar.offline .dot {
+        background: var(--warning);
+        box-shadow: 0 0 6px var(--warning);
+      }
+
+      .status-bar.error {
+        color: var(--accent-red);
+        background: rgba(255, 95, 86, 0.06);
+        border-color: rgba(255, 95, 86, 0.15);
+      }
+
+      .status-bar.error .dot {
+        background: var(--accent-red);
+        box-shadow: 0 0 6px var(--accent-red);
+      }
+
+      /* Width Selector Button Group */
+      .width-selector {
+        display: flex;
+        gap: 8px;
+      }
+
+      .width-btn {
+        flex: 1;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        color: var(--muted);
+        padding: 8px;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        transition: all 0.2s;
+      }
+
+      .width-btn:hover {
+        border-color: rgba(255, 255, 255, 0.1);
+        color: var(--text);
+      }
+
+      .width-btn.active {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: white;
+        box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+      }
+
+      .width-btn .w-val {
+        font-size: 0.95rem;
+        font-weight: 700;
+      }
+
+      .width-btn .w-label {
+        font-size: 0.65rem;
+        opacity: 0.8;
+        margin-top: 1px;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 9px 18px;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .btn-primary {
+        background: var(--accent);
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background: #1d8aff;
+        box-shadow: 0 4px 14px rgba(0, 122, 255, 0.35);
+      }
+
+      .btn-outline {
+        background: transparent;
+        color: var(--text);
+        border: 1px solid var(--border);
+      }
+
+      .btn-outline:hover {
+        background: var(--surface2);
+        border-color: rgba(255, 255, 255, 0.12);
+      }
+
+      .btn-sm {
+        padding: 6px 12px;
+        font-size: 0.75rem;
+        border-radius: 6px;
+      }
+
+      .btn-full {
+        width: 100%;
+      }
+
+      .actions-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 16px;
+      }
+
+      /* ── Live Preview Container ── */
+      .preview-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: rgba(0, 0, 0, 0.2);
+        border: 1px dashed var(--border);
+        border-radius: 10px;
+        padding: 16px;
+        min-height: 280px;
+      }
+
+      /* Receipt styling (Dark Mode) */
+      .thermal-receipt {
+        background: var(--surface2);
+        color: var(--text);
+        font-family: "Courier New", Courier, monospace;
+        font-size: 9px;
+        padding: 12px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .kot-header {
+        text-align: center;
+        margin-bottom: 6px;
+      }
+
+      .kot-title {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 2px;
+      }
+
+      .kot-date-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 8px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+
+      .kot-meta {
+        margin: 6px 0;
+        font-size: 8.5px;
+        line-height: 1.3;
+      }
+
+      .kot-meta-row {
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .kot-divider {
+        border: none;
+        border-top: 1px dashed var(--border);
+        margin: 5px 0;
+      }
+
+      .kot-table-header {
+        display: flex;
+        font-weight: 700;
+        font-size: 8.5px;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 2px;
+        margin-bottom: 3px;
+      }
+
+      .kot-col-no {
+        width: 15px;
+      }
+
+      .kot-col-name {
+        flex: 1;
+      }
+
+      .kot-col-qty {
+        width: 25px;
+        text-align: right;
+      }
+
+      .kot-item {
+        display: flex;
+        font-size: 8.5px;
+        padding: 1px 0;
+      }
+
+      .kot-footer {
+        margin-top: 6px;
+        padding-top: 4px;
+        border-top: 1px dashed var(--border);
+      }
+
+      .kot-total-row {
+        display: flex;
+        justify-content: space-between;
+        font-weight: 700;
+        font-size: 8.5px;
+      }
+
+      .kot-bottom {
+        margin-top: 6px;
+        text-align: center;
+        font-size: 8px;
+        font-weight: 700;
+        letter-spacing: 1px;
+      }
+
+      /* ── Tables ── */
+      .table-card {
+        padding: 0;
+        overflow: hidden;
+      }
+
+      .table-header-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .table-header-bar h3 {
+        margin-bottom: 0;
+      }
+
+      .table-responsive {
+        overflow-x: auto;
+        max-height: calc(100vh - 160px);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+        text-align: left;
+      }
+
+      th,
+      td {
+        padding: 10px 16px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      th {
+        font-weight: 600;
+        color: var(--muted);
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        background: rgba(0, 0, 0, 0.1);
+      }
+
+      tbody tr:hover {
+        background: rgba(255, 255, 255, 0.015);
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.7rem;
+        font-weight: 600;
+      }
+
+      .bg-success {
+        background: rgba(16, 185, 129, 0.12);
+        color: var(--success);
+      }
+
+      .bg-failed {
+        background: rgba(255, 95, 86, 0.12);
+        color: var(--accent-red);
+      }
+
+      .bg-neutral {
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text);
+      }
+
+      .empty-state {
+        text-align: center;
+        color: var(--muted);
+        padding: 32px !important;
+        font-style: italic;
+      }
+
+      /* ── API Docs Cards ── */
+      .api-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-height: calc(100vh - 120px);
+        overflow-y: auto;
+        padding-right: 4px;
+      }
+
+      .api-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .api-top {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 16px;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .api-badge {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.65rem;
+        font-weight: 700;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+
+      .api-badge-get {
+        background: rgba(16, 185, 129, 0.12);
+        color: var(--success);
+        border: 1px solid rgba(16, 185, 129, 0.15);
+      }
+
+      .api-badge-post {
+        background: rgba(0, 122, 255, 0.12);
+        color: var(--accent);
+        border: 1px solid rgba(0, 122, 255, 0.15);
+      }
+
+      .api-path {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.8rem;
+        font-weight: 500;
+      }
+
+      .api-desc {
+        font-size: 0.78rem;
+        color: var(--muted);
+        margin-left: auto;
+      }
+
+      .api-chevron {
+        font-size: 0.72rem;
+        color: var(--muted);
+        transition: transform 0.2s;
+        margin-left: 10px;
+      }
+
+      .api-card.open .api-chevron {
+        transform: rotate(180deg);
+      }
+
+      .api-body {
+        border-top: 1px solid var(--border);
+        background: #0d1117;
+        padding: 14px 16px;
+        display: none;
+      }
+
+      .api-card.open .api-body {
+        display: block;
+      }
+
+      .api-body p {
+        font-size: 0.82rem;
+        color: #8b949e;
+        margin-bottom: 10px;
+      }
+
+      .code-title {
+        font-size: 0.65rem;
+        font-weight: 700;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 4px;
+      }
+
+      .code-box {
+        position: relative;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 6px;
+        padding: 10px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.75rem;
+        overflow-x: auto;
+        color: #c9d1d9;
+        margin-bottom: 10px;
+      }
+
+      .code-box pre {
+        margin: 0;
+      }
+
+      .code-box button {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        color: var(--muted);
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.6rem;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .code-box button:hover {
+        color: var(--text);
+        border-color: rgba(255, 255, 255, 0.15);
+      }
+
+      .c-key {
+        color: #79b8ff;
+      }
+
+      .c-str {
+        color: #9ecbff;
+      }
+
+      .c-bool {
+        color: #ff7b72;
+      }
+
+      /* ── Server Status Cards ── */
+      .status-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+        margin-top: 12px;
+      }
+
+      .status-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .status-card-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+      }
+
+      .sc-green {
+        background: rgba(16, 185, 129, 0.1);
+        color: var(--success);
+      }
+
+      .sc-blue {
+        background: rgba(0, 122, 255, 0.1);
+        color: var(--accent);
+      }
+
+      .sc-yellow {
+        background: rgba(245, 158, 11, 0.1);
+        color: var(--warning);
+      }
+
+      .sc-purple {
+        background: rgba(139, 92, 246, 0.1);
+        color: #8b5cf6;
+      }
+
+      .status-info {
+        flex: 1;
+      }
+
+      .status-name {
+        font-size: 0.72rem;
+        color: var(--muted);
+        font-weight: 500;
+      }
+
+      .status-val {
+        font-size: 0.9rem;
+        font-weight: 700;
+        margin-top: 2px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="app-window">
+      <!-- ── Titlebar ── -->
+      <div class="app-titlebar">
+        <div class="traffic-lights">
+          <span class="light light-close"></span>
+          <span class="light light-minimize"></span>
+          <span class="light light-maximize"></span>
+        </div>
+        <div class="app-title">Thermal Printer Manager</div>
+        <div class="server-status">
+          <div class="status-dot"></div>
+          <span>API Live :4100</span>
+        </div>
+      </div>
+
+      <!-- ── App Body ── -->
+      <div class="app-body">
+        <!-- Sidebar Navigation -->
+        <div class="app-sidebar">
+          <div class="sidebar-header">
+            <div class="sidebar-logo"><i class="fas fa-receipt"></i></div>
+            <h2>Thermal-Printer</h2>
+          </div>
+          <ul class="nav-list">
+            <li class="nav-item active" data-tab="dashboard">
+              <i class="fas fa-desktop"></i>
+              <span>Dashboard</span>
+            </li>
+            <li class="nav-item" data-tab="status">
+              <i class="fas fa-server"></i>
+              <span>Server Status</span>
+            </li>
+            <li class="nav-item" data-tab="history">
+              <i class="fas fa-history"></i>
+              <span>Print Log</span>
+            </li>
+            <li class="nav-item" data-tab="api">
+              <i class="fas fa-code"></i>
+              <span>API Reference</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Main Content Panel -->
+        <div class="app-content">
+          <!-- ── TAB: Dashboard ── -->
+          <div id="view-dashboard" class="content-view active">
+            <div class="view-header">
+              <h1>Printer Console</h1>
+              <p>
+                Select an installed device, choose formatting, and run print
+                tests.
+              </p>
+            </div>
+            <div class="dashboard-grid">
+              <!-- Config Card -->
+              <div class="card">
+                <h3><i class="fas fa-cog"></i> Configuration</h3>
+                <div class="form-group">
+                  <label for="printerSelect">Connected Device</label>
+                  <div class="select-wrapper">
+                    <select id="printerSelect">
+                      <option value="">Scanning devices...</option>
+                    </select>
+                    <button
+                      id="refreshPrintersBtn"
+                      class="btn-icon"
+                      title="Rescan Devices"
+                    >
+                      <i class="fas fa-sync-alt"></i>
+                    </button>
+                  </div>
+                </div>
+
+                <div id="selectedPrinterStatus" class="status-bar offline">
+                  <span class="dot"></span>
+                  <span class="status-text">Detecting device...</span>
+                </div>
+
+                <div class="form-group">
+                  <label>Paper Width Check</label>
+                  <div class="width-selector">
+                    <button type="button" class="width-btn" data-width="58">
+                      <span class="w-val">2"</span>
+                      <span class="w-label">58mm</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="width-btn active"
+                      data-width="80"
+                    >
+                      <span class="w-val">3"</span>
+                      <span class="w-label">80mm</span>
+                    </button>
+                    <button type="button" class="width-btn" data-width="100">
+                      <span class="w-val">4"</span>
+                      <span class="w-label">100mm</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="actions-group">
+                  <button class="btn btn-primary btn-full" id="testPrintBtn">
+                    <i class="fas fa-print"></i> Send Test Print
+                  </button>
+                  <button
+                    class="btn btn-outline btn-full"
+                    id="clearQueueBtn"
+                    style="
+                      color: var(--accent-red);
+                      border-color: rgba(255, 95, 86, 0.25);
+                    "
+                  >
+                    <i class="fas fa-trash-alt"></i> Clear Print Queue
+                  </button>
+                </div>
+              </div>
+
+              <!-- Live Preview Card -->
+              <div class="card">
+                <h3><i class="fas fa-eye"></i> Live KOT Preview</h3>
+                <div class="preview-container">
+                  <div
+                    class="thermal-receipt"
+                    id="controlReceipt"
+                    style="width: 260px"
+                  >
+                    <div class="kot-header">
+                      <div class="kot-title">TEST PRINT</div>
+                      <div class="kot-date-row">
+                        <span id="testReceiptDate">Date : --</span>
+                        <span><strong>KOT: TEST</strong></span>
+                      </div>
+                    </div>
+                    <div class="kot-meta">
+                      <div class="kot-meta-row">
+                        <span>Type : Paper Width Check</span>
+                      </div>
+                      <div class="kot-meta-row">
+                        <span
+                          >Width:
+                          <span id="metaWidthText">80mm (3")</span></span
+                        >
+                      </div>
+                      <div class="kot-meta-row">
+                        <span
+                          >Target: <span id="metaPrinterText">None</span></span
+                        >
+                      </div>
+                    </div>
+                    <hr class="kot-divider" />
+                    <div class="kot-table-header">
+                      <span class="kot-col-no">No</span>
+                      <span class="kot-col-name">Item Name</span>
+                      <span class="kot-col-qty">Qty</span>
+                    </div>
+                    <div class="kot-item">
+                      <span class="kot-col-no">1</span
+                      ><span class="kot-col-name">Thermal Check Print</span
+                      ><span class="kot-col-qty">1</span>
+                    </div>
+                    <div class="kot-item">
+                      <span class="kot-col-no">2</span
+                      ><span class="kot-col-name">Format Verification</span
+                      ><span class="kot-col-qty">1</span>
+                    </div>
+                    <div class="kot-item">
+                      <span class="kot-col-no">3</span
+                      ><span class="kot-col-name">macOS Desktop Layout</span
+                      ><span class="kot-col-qty">1</span>
+                    </div>
+                    <div class="kot-footer">
+                      <div class="kot-total-row">
+                        <span>Result Status</span>
+                        <span>PASS</span>
+                      </div>
+                    </div>
+                    <div class="kot-bottom">— RECEIPT END —</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── TAB: Status ── -->
+          <div id="view-status" class="content-view">
+            <div class="view-header">
+              <h1>Server Status</h1>
+              <p>
+                Monitor local print server connection details and system
+                statistics.
+              </p>
+            </div>
+            <div class="status-grid">
+              <div class="status-card">
+                <div class="status-card-icon sc-green">
+                  <i class="fas fa-server"></i>
+                </div>
+                <div class="status-info">
+                  <div class="status-name">API Host</div>
+                  <div class="status-val" style="color: var(--success)">
+                    Running
+                  </div>
+                </div>
+              </div>
+              <div class="status-card">
+                <div class="status-card-icon sc-blue">
+                  <i class="fas fa-plug"></i>
+                </div>
+                <div class="status-info">
+                  <div class="status-name">Port</div>
+                  <div class="status-val">4100</div>
+                </div>
+              </div>
+              <div class="status-card">
+                <div class="status-card-icon sc-purple">
+                  <i class="fas fa-portrait"></i>
+                </div>
+                <div class="status-info">
+                  <div class="status-name">Layout Orientation</div>
+                  <div class="status-val">Portrait Only</div>
+                </div>
+              </div>
+              <div class="status-card">
+                <div class="status-card-icon sc-yellow">
+                  <i class="fas fa-globe"></i>
+                </div>
+                <div class="status-info">
+                  <div class="status-name">Environment</div>
+                  <div class="status-val">Localhost</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── TAB: History ── -->
+          <div id="view-history" class="content-view">
+            <div class="view-header">
+              <h1>Print Logs</h1>
+              <p>Inspect list of print operations executed by this machine.</p>
+            </div>
+            <div class="card table-card">
+              <div class="table-header-bar">
+                <h3>Job History</h3>
+                <button class="btn btn-outline btn-sm" id="clearHistoryBtn">
+                  <i class="fas fa-eraser"></i> Clear Logs
+                </button>
+              </div>
+              <div class="table-responsive">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Time</th>
+                      <th>Printer</th>
+                      <th>Paper Width</th>
+                      <th>Job Type</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="historyTableBody">
+                    <tr>
+                      <td colspan="5" class="empty-state">
+                        No print operations logged.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── TAB: API Docs ── -->
+          <div id="view-api" class="content-view">
+            <div class="view-header">
+              <h1>API Reference</h1>
+              <p>
+                Integrate your applications directly using these local REST
+                endpoints.
+              </p>
+            </div>
+            <div class="api-list">
+              <!-- Endpoint 1 -->
+              <div class="api-card" id="ac1">
+                <div class="api-top" onclick="toggleApi('ac1')">
+                  <span class="api-badge api-badge-get">GET</span>
+                  <span class="api-path">/printers</span>
+                  <span class="api-desc">Fetch installed printers list</span>
+                  <i class="fas fa-chevron-down api-chevron"></i>
+                </div>
+                <div class="api-body">
+                  <p>
+                    Returns an array of all installed system printers with
+                    connection statuses.
+                  </p>
+                  <div class="code-title">HTTP Response (200)</div>
+                  <div class="code-box">
+                    <button onclick="copyCode(this)">Copy</button>
+                    <pre>{
+  <span class="c-key">"message"</span>: <span class="c-str">"Printers fetched successfully"</span>,
+  <span class="c-key">"printers"</span>: [
+    {
+      <span class="c-key">"name"</span>: <span class="c-str">"POS-80C"</span>,
+      <span class="c-key">"printerStatus"</span>: <span class="c-str">"Ready"</span>,
+      <span class="c-key">"connectionStatus"</span>: <span class="c-str">"Connected"</span>,
+      <span class="c-key">"isConnected"</span>: <span class="c-bool">true</span>
+    }
+  ]
+}</pre>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Endpoint 2 -->
+              <div class="api-card" id="ac2">
+                <div class="api-top" onclick="toggleApi('ac2')">
+                  <span class="api-badge api-badge-post">POST</span>
+                  <span class="api-path">/print</span>
+                  <span class="api-desc">Send print job</span>
+                  <i class="fas fa-chevron-down api-chevron"></i>
+                </div>
+                <div class="api-body">
+                  <p>
+                    Send a base64 encoded PDF or image to be printed. Page width
+                    will scale automatically.
+                  </p>
+                  <div class="code-title">HTTP Request Payload</div>
+                  <div class="code-box">
+                    <button onclick="copyCode(this)">Copy</button>
+                    <pre>{
+  <span class="c-key">"imageBase64"</span>: <span class="c-str">"data:image/png;base64,iVBORw..."</span>,
+  <span class="c-key">"printernamefromfrontend"</span>: [<span class="c-str">"POS-80C"</span>],
+  <span class="c-key">"paperWidth"</span>: <span class="c-num">80</span> <span class="json-comment">// Optional: 58, 80, or 100</span>
+}</pre>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Endpoint 3 -->
+              <div class="api-card" id="ac3">
+                <div class="api-top" onclick="toggleApi('ac3')">
+                  <span class="api-badge api-badge-post">POST</span>
+                  <span class="api-path">/clear-queue</span>
+                  <span class="api-desc">Clear print queue</span>
+                  <i class="fas fa-chevron-down api-chevron"></i>
+                </div>
+                <div class="api-body">
+                  <p>Cancels all pending print operations for a printer.</p>
+                  <div class="code-title">HTTP Request Payload</div>
+                  <div class="code-box">
+                    <button onclick="copyCode(this)">Copy</button>
+                    <pre>{
+  <span class="c-key">"printerName"</span>: <span class="c-str">"POS-80C"</span>
+}</pre>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Endpoint 4 -->
+              <div class="api-card" id="ac4">
+                <div class="api-top" onclick="toggleApi('ac4')">
+                  <span class="api-badge api-badge-post">POST</span>
+                  <span class="api-path">/check-connection</span>
+                  <span class="api-desc">Verify printer connectivity</span>
+                  <i class="fas fa-chevron-down api-chevron"></i>
+                </div>
+                <div class="api-body">
+                  <p>
+                    Verify if a specific system printer is online and ready.
+                  </p>
+                  <div class="code-title">HTTP Request Payload</div>
+                  <div class="code-box">
+                    <button onclick="copyCode(this)">Copy</button>
+                    <pre>{
+  <span class="c-key">"printerName"</span>: <span class="c-str">"POS-80C"</span>
+}</pre>
+                  </div>
+                  <div class="code-title">HTTP Response (200)</div>
+                  <div class="code-box">
+                    <pre>{
+  <span class="c-key">"message"</span>: <span class="c-str">"Connection check complete"</span>,
+  <span class="c-key">"results"</span>: [
+    {
+      <span class="c-key">"name"</span>: <span class="c-str">"POS-80C"</span>,
+      <span class="c-key">"status"</span>: <span class="c-str">"Ready"</span>,
+      <span class="c-key">"workOffline"</span>: <span class="c-bool">false</span>,
+      <span class="c-key">"connectionStatus"</span>: <span class="c-str">"Connected"</span>,
+      <span class="c-key">"port"</span>: <span class="c-str">"USB001"</span>
+    }
+  ]
+}</pre>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Endpoint 5 -->
+              <div class="api-card" id="ac5">
+                <div class="api-top" onclick="toggleApi('ac5')">
+                  <span class="api-badge api-badge-post">POST</span>
+                  <span class="api-path">/queue</span>
+                  <span class="api-desc">Inspect printer job queue</span>
+                  <i class="fas fa-chevron-down api-chevron"></i>
+                </div>
+                <div class="api-body">
+                  <p>
+                    Get a list of all active pending print jobs for a specific
+                    printer.
+                  </p>
+                  <div class="code-title">HTTP Request Payload</div>
+                  <div class="code-box">
+                    <button onclick="copyCode(this)">Copy</button>
+                    <pre>{
+  <span class="c-key">"printerName"</span>: <span class="c-str">"POS-80C"</span>
+}</pre>
+                  </div>
+                  <div class="code-title">HTTP Response (200)</div>
+                  <div class="code-box">
+                    <pre>{
+  <span class="c-key">"message"</span>: <span class="c-str">"1 jobs pending"</span>,
+  <span class="c-key">"jobs"</span>: [
+    {
+      <span class="c-key">"id"</span>: <span class="c-num">152</span>,
+      <span class="c-key">"document"</span>: <span class="c-str">"KOT-Receipt-25949.pdf"</span>,
+      <span class="c-key">"status"</span>: <span class="c-str">"Printing"</span>,
+      <span class="c-key">"time"</span>: <span class="c-str">"6/19/2026 4:30:15 PM"</span>
+    }
+  ]
+}</pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const months = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+      ];
+
+      // ── Sidebar Tab Switching ──
+      const navItems = document.querySelectorAll(".nav-item");
+      const contentViews = document.querySelectorAll(".content-view");
+
+      navItems.forEach((item) => {
+        item.addEventListener("click", () => {
+          // Remove active states
+          navItems.forEach((nav) => nav.classList.remove("active"));
+          contentViews.forEach((view) => view.classList.remove("active"));
+
+          // Add active state to clicked item
+          item.classList.add("active");
+
+          // Show active view
+          const viewId = "view-" + item.dataset.tab;
+          document.getElementById(viewId).classList.add("active");
+        });
+      });
+
+      // ── Dashboard Logic ──
+      let selectedWidth = 80; // default 80mm
+      let selectedPrinter = "";
+
+      // Set preview date
+      function updatePreviewDate() {
+        const dTest = new Date();
+        const testDateStr = `${dTest.getDate()}-${months[dTest.getMonth()]} | ${dTest.getHours()}:${String(dTest.getMinutes()).padStart(2, "0")} ${dTest.getHours() >= 12 ? "PM" : "AM"}`;
+        document.getElementById("testReceiptDate").textContent = testDateStr;
+      }
+      updatePreviewDate();
+
+      // Populate Printers dropdown
+      async function loadPrinters() {
+        const printerSelect = document.getElementById("printerSelect");
+        printerSelect.innerHTML =
+          '<option value="">Scanning installed devices...</option>';
+        try {
+          const res = await fetch("http://localhost:4100/printers");
+          const data = await res.json();
+
+          if (data.printers && data.printers.length > 0) {
+            printerSelect.innerHTML = "";
+            data.printers.forEach((p) => {
+              const opt = document.createElement("option");
+              opt.value = p.name;
+              opt.textContent = `${p.name}`;
+              printerSelect.appendChild(opt);
+            });
+
+            // Select first printer
+            printerSelect.value = data.printers[0].name;
+            handlePrinterSelection(data.printers[0].name);
+          } else {
+            printerSelect.innerHTML =
+              '<option value="">No printers detected</option>';
+            updatePrinterStatus("error", "No printers found");
+          }
+        } catch (err) {
+          console.error("Failed to load printers:", err);
+          printerSelect.innerHTML =
+            '<option value="">Error scanning devices</option>';
+          updatePrinterStatus("error", "Local print server offline");
+        }
+      }
+
+      // Handle printer selection & check connection status
+      async function handlePrinterSelection(name) {
+        selectedPrinter = name;
+        document.getElementById("metaPrinterText").textContent = name || "None";
+
+        if (!name) {
+          updatePrinterStatus("offline", "No printer selected");
+          return;
+        }
+
+        updatePrinterStatus("pending", "Checking connection...");
+
+        try {
+          const res = await fetch("http://localhost:4100/check-connection", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ printerName: name }),
+          });
+          const data = await res.json();
+          const result = data.results && data.results[0];
+
+          if (result) {
+            if (result.connectionStatus === "Connected") {
+              updatePrinterStatus(
+                "online",
+                `Online | Port: ${result.port || "N/A"}`,
+              );
+            } else {
+              updatePrinterStatus(
+                "offline",
+                `Offline (${result.status || "Unknown"})`,
+              );
+            }
+          } else {
+            updatePrinterStatus("error", "Verification failed");
+          }
+        } catch (err) {
+          updatePrinterStatus("error", "Failed to check status");
+        }
+      }
+
+      function updatePrinterStatus(state, message) {
+        const statusBar = document.getElementById("selectedPrinterStatus");
+        if (statusBar) {
+          statusBar.className = `status-bar ${state}`;
+          statusBar.querySelector(".status-text").textContent = message;
+        }
+      }
+
+      // Width Selection
+      const widthButtons = document.querySelectorAll(".width-btn");
+      widthButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          widthButtons.forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+
+          selectedWidth = parseInt(btn.dataset.width);
+
+          // Resize mockup receipt on UI
+          const mockup = document.getElementById("controlReceipt");
+          if (selectedWidth === 58) {
+            mockup.style.width = "200px";
+            document.getElementById("metaWidthText").textContent = '58mm (2")';
+          } else if (selectedWidth === 80) {
+            mockup.style.width = "260px";
+            document.getElementById("metaWidthText").textContent = '80mm (3")';
+          } else if (selectedWidth === 100) {
+            mockup.style.width = "320px";
+            document.getElementById("metaWidthText").textContent = '100mm (4")';
+          }
+        });
+      });
+
+      // Generate Test Receipt PNG via Canvas
+      function generateTestReceiptBase64(widthMm, printerName) {
+        const canvas = document.createElement("canvas");
+
+        let widthPx = 576; // 80mm
+        if (widthMm === 58) widthPx = 384;
+        else if (widthMm === 100) widthPx = 832;
+
+        const lineHt = Math.round(widthPx * 0.06);
+        const padding = Math.round(widthPx * 0.05);
+        const heightPx = padding * 2 + lineHt * 14;
+
+        canvas.width = widthPx;
+        canvas.height = heightPx;
+
+        const ctx = canvas.getContext("2d");
+
+        // Fill white bg
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, widthPx, heightPx);
+
+        // Text defaults
+        ctx.fillStyle = "#111111";
+        ctx.textBaseline = "top";
+
+        // Header
+        ctx.font = `bold ${Math.round(widthPx * 0.08)}px monospace`;
+        ctx.textAlign = "center";
+        ctx.fillText("TEST PRINT", widthPx / 2, padding);
+
+        ctx.font = `${Math.round(widthPx * 0.05)}px monospace`;
+        ctx.fillText(
+          "Thermal Print Check",
+          widthPx / 2,
+          padding + lineHt * 1.3,
+        );
+
+        const dashChar = widthMm === 58 ? 24 : widthMm === 80 ? 32 : 44;
+        ctx.fillText("-".repeat(dashChar), widthPx / 2, padding + lineHt * 2.3);
+
+        // Meta Info
+        ctx.textAlign = "left";
+        ctx.font = `${Math.round(widthPx * 0.045)}px monospace`;
+        const startY = padding + lineHt * 3.3;
+
+        ctx.fillText(`Printer: ${printerName || "Default"}`, padding, startY);
+        ctx.fillText(
+          `Format:  ${widthMm}mm (${widthMm === 58 ? '2"' : widthMm === 80 ? '3"' : '4"'})`,
+          padding,
+          startY + lineHt,
+        );
+        ctx.fillText(
+          `Date:    ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`,
+          padding,
+          startY + lineHt * 2,
+        );
+
+        ctx.textAlign = "center";
+        ctx.fillText("-".repeat(dashChar), widthPx / 2, startY + lineHt * 3);
+
+        // Table Header
+        ctx.textAlign = "left";
+        const tableY = startY + lineHt * 4;
+        ctx.fillText("Qty  Description", padding, tableY);
+        ctx.textAlign = "right";
+        ctx.fillText("Status", widthPx - padding, tableY);
+
+        // Items
+        ctx.font = `bold ${Math.round(widthPx * 0.045)}px monospace`;
+        const item1Y = tableY + lineHt * 1.2;
+        ctx.textAlign = "left";
+        ctx.fillText("1    Width Check OK", padding, item1Y);
+        ctx.textAlign = "right";
+        ctx.fillText("PASS", widthPx - padding, item1Y);
+
+        const item2Y = item1Y + lineHt;
+        ctx.textAlign = "left";
+        ctx.fillText("1    Connection test", padding, item2Y);
+        ctx.textAlign = "right";
+        ctx.fillText("PASS", widthPx - padding, item2Y);
+
+        const item3Y = item2Y + lineHt;
+        ctx.textAlign = "left";
+        ctx.fillText("1    macOS Dashboard", padding, item3Y);
+        ctx.textAlign = "right";
+        ctx.fillText("PASS", widthPx - padding, item3Y);
+
+        // Divider
+        ctx.textAlign = "center";
+        ctx.font = `${Math.round(widthPx * 0.045)}px monospace`;
+        ctx.fillText("-".repeat(dashChar), widthPx / 2, item3Y + lineHt);
+
+        // Footer
+        ctx.font = `bold ${Math.round(widthPx * 0.05)}px monospace`;
+        ctx.fillText("** TEST SUCCESSFUL **", widthPx / 2, item3Y + lineHt * 2);
+
+        return canvas.toDataURL("image/png");
+      }
+
+      // Test Print Trigger
+      document
+        .getElementById("testPrintBtn")
+        .addEventListener("click", async () => {
+          if (!selectedPrinter) {
+            alert("Please select a printer first.");
+            return;
+          }
+
+          const testBtn = document.getElementById("testPrintBtn");
+          testBtn.disabled = true;
+          testBtn.innerHTML =
+            '<i class="fas fa-spinner fa-spin"></i> Printing...';
+
+          const imageBase64 = generateTestReceiptBase64(
+            selectedWidth,
+            selectedPrinter,
+          );
+          updatePreviewDate();
+
+          try {
+            const res = await fetch("http://localhost:4100/print", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                imageBase64: imageBase64,
+                printernamefromfrontend: [selectedPrinter],
+                paperWidth: selectedWidth,
+              }),
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+              addHistoryItem(
+                selectedPrinter,
+                `${selectedWidth}mm`,
+                "Test Receipt",
+                "Success",
+              );
+            } else {
+              addHistoryItem(
+                selectedPrinter,
+                `${selectedWidth}mm`,
+                "Test Receipt",
+                "Failed",
+              );
+              alert(`Print Error: ${data.message}`);
+            }
+          } catch (err) {
+            console.error("Print request failed:", err);
+            addHistoryItem(
+              selectedPrinter,
+              `${selectedWidth}mm`,
+              "Test Receipt",
+              "Failed",
+            );
+            alert("Failed to communicate with printer API.");
+          } finally {
+            testBtn.disabled = false;
+            testBtn.innerHTML = '<i class="fas fa-print"></i> Send Test Print';
+          }
+        });
+
+      // Clear Print Queue
+      document
+        .getElementById("clearQueueBtn")
+        .addEventListener("click", async () => {
+          if (!selectedPrinter) return;
+          if (
+            !confirm(
+              `Are you sure you want to clear the print queue for ${selectedPrinter}?`,
+            )
+          )
+            return;
+
+          const clearBtn = document.getElementById("clearQueueBtn");
+          clearBtn.disabled = true;
+          clearBtn.innerHTML =
+            '<i class="fas fa-spinner fa-spin"></i> Clearing...';
+
+          try {
+            const res = await fetch("http://localhost:4100/clear-queue", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ printerName: selectedPrinter }),
+            });
+            const data = await res.json();
+            alert(data.message);
+          } catch (err) {
+            alert("Failed to clear queue.");
+          } finally {
+            clearBtn.disabled = false;
+            clearBtn.innerHTML =
+              '<i class="fas fa-trash-alt"></i> Clear Print Queue';
+          }
+        });
+
+      function getHistory() {
+        const h = localStorage.getItem("print_history");
+        return h ? JSON.parse(h) : [];
+      }
+
+      function saveHistory(h) {
+        localStorage.setItem("print_history", JSON.stringify(h));
+      }
+
+      function renderHistory() {
+        const history = getHistory();
+        const tbody = document.getElementById("historyTableBody");
+
+        if (!tbody) return;
+
+        if (history.length === 0) {
+          tbody.innerHTML =
+            '<tr><td colspan="5" class="empty-state">No print operations logged.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = "";
+        history.forEach((item) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+                <td>${item.time}</td>
+                <td><strong>${item.printer}</strong></td>
+                <td><span class="badge bg-neutral">${item.width}</span></td>
+                <td>${item.type}</td>
+                <td>
+                    <span class="badge ${item.status === "Success" ? "bg-success" : "bg-failed"}">
+                        <i class="fas ${item.status === "Success" ? "fa-check" : "fa-times"}"></i> ${item.status}
+                    </span>
+                </td>
+            `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      function addHistoryItem(printer, width, type, status) {
+        const history = getHistory();
+        const now = new Date();
+        const timeStr = `${now.getHours()}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+
+        history.unshift({ time: timeStr, printer, width, type, status });
+        if (history.length > 20) history.pop();
+
+        saveHistory(history);
+        renderHistory();
+      }
+
+      document
+        .getElementById("refreshPrintersBtn")
+        .addEventListener("click", loadPrinters);
+
+      document
+        .getElementById("clearHistoryBtn")
+        .addEventListener("click", () => {
+          if (confirm("Clear print history logs?")) {
+            saveHistory([]);
+            renderHistory();
+          }
+        });
+
+      document
+        .getElementById("printerSelect")
+        .addEventListener("change", (e) => {
+          handlePrinterSelection(e.target.value);
+        });
+
+      function toggleApi(id) {
+        document.getElementById(id).classList.toggle("open");
+      }
+
+      function copyCode(btn) {
+        const pre = btn.nextElementSibling;
+        navigator.clipboard.writeText(pre.innerText).then(() => {
+          btn.textContent = "Copied!";
+          setTimeout(() => {
+            btn.textContent = "Copy";
+          }, 1500);
+        });
+      }
+
+      window.addEventListener("DOMContentLoaded", () => {
+        loadPrinters();
+        renderHistory();
+
+        const closeBtn = document.querySelector(".light-close");
+        const minimizeBtn = document.querySelector(".light-minimize");
+        const maximizeBtn = document.querySelector(".light-maximize");
+
+        if (window.electronAPI) {
+          closeBtn.addEventListener("click", () => window.electronAPI.close());
+          minimizeBtn.addEventListener("click", () =>
+            window.electronAPI.minimize(),
+          );
+          maximizeBtn.addEventListener("click", () =>
+            window.electronAPI.maximize(),
+          );
+        } else {
+          closeBtn.addEventListener("click", () =>
+            console.log("Close Window clicked"),
+          );
+          minimizeBtn.addEventListener("click", () =>
+            console.log("Minimize Window clicked"),
+          );
+          maximizeBtn.addEventListener("click", () =>
+            console.log("Maximize Window clicked"),
+          );
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -1,1 +1,1 @@
-# CataloguePrinterService
+# electron_thermal_printer
