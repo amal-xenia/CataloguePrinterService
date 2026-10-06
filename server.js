@@ -274,13 +274,24 @@ app.post("/print", async (req, res) => {
       });
     }
 
-    // Determine target width in points (72 points = 1 inch, 25.4 mm = 1 inch)
-    let targetWidth = 226.77; // default 80mm (3")
+    // Determine target printable width in points (1 inch = 72 pt, 1 inch = 25.4 mm)
+    // NOTE: Thermal paper rolls (80mm, 58mm, 100mm) have tiny non-printable physical margins
+    // on the sides. To eliminate unwanted white blank space around the receipt and ensure
+    // edge-to-edge full-width printing while preventing right-side cropping:
+    // - 80mm roll -> We use 216 pt (~76.2 mm). Combined with scale: "shrink", this spans edge-to-edge
+    //   across the 72mm thermal head without wasted side borders or cropping.
+    // - 58mm roll -> We use 156 pt (~55 mm).
+    // - 100mm roll -> We use 274 pt (~96.6 mm).
+    let targetWidth = 216; // default 80mm (3") -> 216 pt (~76.2mm edge-to-edge width)
     const widthVal = parseInt(paperWidth);
     if (widthVal === 58) {
-      targetWidth = 164.41; // 58mm (2")
+      targetWidth = 156; // 58mm (2") -> 156 pt (~55mm edge-to-edge width)
     } else if (widthVal === 100) {
-      targetWidth = 283.46; // 100mm (4")
+      targetWidth = 274; // 100mm (4") -> 274 pt (~96.6mm edge-to-edge width)
+    } else if (widthVal && widthVal !== 80) {
+      // For custom roll widths, convert mm to points and subtract a minimal 3mm margin
+      const PT_PER_MM = 72 / 25.4;
+      targetWidth = Math.max(100, (widthVal - 3) * PT_PER_MM);
     }
 
     let binaryData;
@@ -314,12 +325,41 @@ app.post("/print", async (req, res) => {
       });
 
       const pdfBytes = await pdfDoc.save();
-      binaryData = Buffer.from(pdfBytes);
+      // Write directly — page is already correctly sized; skip the second resize pass.
+      const tempDir = os.tmpdir();
+      const tempFilePath = path.resolve(tempDir, `temp_${Date.now()}.pdf`);
+      fs.writeFileSync(tempFilePath, Buffer.from(pdfBytes));
+
+      console.log("Sending to printers (image path):", printernamefromfrontend);
+      await Promise.all(
+        printernamefromfrontend.map((printer) =>
+          pdfToPrinter
+            .print(tempFilePath, {
+              printer,
+              // Use scale: "shrink" and orientation: "portrait" (valid options in pdf-to-printer).
+              // "shrink" ensures that if a printer driver reports a narrower printable box,
+              // SumatraPDF automatically scales it down instead of clipping/cropping on the right.
+              scale: "shrink",
+              orientation: "portrait",
+            })
+            .then(() => console.log(`✅ Printed to ${printer}`))
+            .catch((err) =>
+              console.error(`❌ Failed to print to ${printer}:`, err),
+            ),
+        ),
+      );
+
+      setTimeout(() => {
+        if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+      }, 10000);
+
+      return res.status(200).json({ message: "PDF printed successfully!" });
     } else {
       const base64Data = pdfBase64.replace(/^data:.*;base64,/, "");
       binaryData = Buffer.from(base64Data, "base64");
     }
 
+    // ── PDF path: scale content proportionally to fit target width ──────────
     let pdfDoc;
     try {
       pdfDoc = await PDFDocument.load(binaryData);
@@ -335,11 +375,24 @@ app.post("/print", async (req, res) => {
     pages.forEach((page) => {
       const { width, height } = page.getSize();
 
-      if (width > height) {
-        page.setSize(targetWidth, width);
-      } else {
-        page.setSize(targetWidth, height);
+      // Treat landscape pages as portrait (swap dims if wider than tall)
+      const srcW = width > height ? height : width;
+      const srcH = width > height ? width : height;
+
+      if (Math.abs(srcW - targetWidth) < 2) {
+        // Already the right width — just ensure portrait orientation
+        page.setSize(srcW, srcH);
+        return;
       }
+
+      // Scale the entire page content so it fits targetWidth exactly.
+      // This moves/scales all drawn content; without this, setSize only
+      // resizes the page box and content overflows → gets clipped.
+      const scale = targetWidth / srcW;
+      const newHeight = srcH * scale;
+
+      page.scaleContent(scale, scale);
+      page.setSize(targetWidth, newHeight);
     });
 
     const updatedPdfBytes = await pdfDoc.save();
@@ -347,12 +400,17 @@ app.post("/print", async (req, res) => {
     const tempFilePath = path.resolve(tempDir, `temp_${Date.now()}.pdf`);
     fs.writeFileSync(tempFilePath, updatedPdfBytes);
 
-    console.log("Sending to printers:", printernamefromfrontend);
+    console.log("Sending to printers (pdf path):", printernamefromfrontend);
 
     await Promise.all(
       printernamefromfrontend.map((printer) =>
         pdfToPrinter
-          .print(tempFilePath, { printer })
+          .print(tempFilePath, {
+            printer,
+            // Use scale: "shrink" and orientation: "portrait" (valid options in pdf-to-printer).
+            scale: "shrink",
+            orientation: "portrait",
+          })
           .then(() => console.log(`✅ Printed to ${printer}`))
           .catch((err) =>
             console.error(`❌ Failed to print to ${printer}:`, err),
